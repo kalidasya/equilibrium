@@ -1,4 +1,5 @@
 import copy
+import operator
 import random
 import sys
 
@@ -42,9 +43,9 @@ def init():
     window = pygame.display.set_mode(SCREEN)
     clock = pygame.time.Clock()
 
-    toolbox =  base.Toolbox()
+    toolbox = base.Toolbox()
     # toolbox.register('algae', tools.initRepeat, Algae, n=1)
-    toolbox.register('evaluate', Algae.eval)
+    # toolbox.register('evaluate', Algae.eval)
 
     return window, clock, toolbox
 
@@ -82,7 +83,7 @@ def main():
 
     gen = 0
     while True:
-        clock.tick(1)
+        clock.tick(60)
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
@@ -117,7 +118,7 @@ def main():
                 entity.tree = temp.tree
             temp.kill()
 
-            entity.fitness.values = toolbox.evaluate(entity)
+            entity.fitness.values = entity.eval()
             entity.update_color()
 
         # die
@@ -129,17 +130,13 @@ def main():
         possible_mates = pygame.sprite.groupcollide(
             all_algae, all_algae, False, False,
             collided=vicinity_collision)
-        for base, mates in possible_mates.items():
+        possible_mates_sorted = sorted(list(possible_mates.keys()), key=lambda x: x.eval(), reverse=True)
+        for base in possible_mates_sorted:
+            mates = possible_mates[base]
             if base.eval() > base.MATING_LIMIT and not base.mated:
-                possible_partners = [p for p in mates if p.eval() > p.MATING_LIMIT and not p.mated and len(base.tree) == len(p.tree)]
+                possible_partners = sorted([p for p in mates if p.eval() > p.MATING_LIMIT and not p.mated], key=lambda x: x.eval(), reverse=True)
                 if possible_partners:
-                    pair = base, random.choice(possible_partners)
-                    pair[0].mated = True
-                    pair[1].mated = True
-                    print(f"{len(base.tree)} {len(pair[1].tree)}")
-                    children = tools.cxOnePoint(toolbox.clone(pair[0].tree), toolbox.clone(pair[1].tree))
-                    choice = random.randint(0, 1)
-                    child = Algae(world_surface, pset=pair[choice].pset, tree=children[choice])
+                    child = Algae.mate(base, possible_partners[0])
                     all_algae.add(child)
                     all_sprites.add(child)
 

@@ -1,3 +1,5 @@
+import copy
+
 import pygraphviz as pgv
 import random
 from functools import partial
@@ -40,34 +42,43 @@ class Algae(pygame.sprite.Sprite):
     ROTATE_DRAIN = 1
     MOVE_DRAIN = 2
     PHOTOSYNTHESIS_GAIN = 100
+    MATING_DRAIN = 20
     MATING_LIMIT = 50,
 
     DEAD = 0,
 
     fitness = creator.FitnessMax
 
-    def __init__(self, world: pygame.Surface, copy=False, pset=None, tree=None):
+    def __init__(self, world: pygame.Surface, pset=None, tree=None, center=None):
         super().__init__()
         self.world = world
         self.screen = self.world.get_size()
-        if not copy:
-            self.image = pygame.Surface((self.WIDTH, self.HEIGHT))
-            self.image.fill((0, 255, 0))
-            self.rect = self.image.get_rect()
-            self.rect.center = (random.randint(self.WIDTH, self.screen[0] - self.WIDTH), random.randint(self.HEIGHT, self.screen[1] - self.HEIGHT))
-            self.mating_rect = self.rect.inflate(6, 6)
-            self.mated = False
+        self.image = pygame.Surface((self.WIDTH, self.HEIGHT))
+        self.image.fill((0, 255, 0))
+        self.rect = self.image.get_rect()
+        if center:
+            self.rect.center = center
+        else:
+            self.rect.center = (random.randint(self.WIDTH, self.screen[0] - self.WIDTH),
+                                random.randint(self.HEIGHT, self.screen[1] - self.HEIGHT))
+        self.mating_rect = self.rect.inflate(6, 6)
+        self.mated = False
 
-            self.energy = RangedNumber(0, 100, 100)
-            self.dir = random.randint(0, 3)
+        self.energy = RangedNumber(0, 100, 60)
+        self.dir = random.randint(0, 3)
 
-            if pset is None:
-                self.pset = set_brain(self)
+        if pset is None:
+            self.pset = set_brain(self)
+            self.tree = PrimitiveTree(self.expr_init())
+        else:
+            self.pset = copy.deepcopy(pset)
+            for k, v in self.pset.context.items():
+                if f := getattr(self, k, None):
+                    self.pset.context[k] = f
+            # print(f"{str(self.pset)} {self.pset.context}")
+            self.tree = tree
+            if self.tree is None:
                 self.tree = PrimitiveTree(self.expr_init())
-            else:
-                self.pset = pset
-                self.tree = tree
-
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -83,6 +94,15 @@ class Algae(pygame.sprite.Sprite):
 
     def mutate(self):
         return gp.mutUniform(self.tree, expr=self.expr_init, pset=self.pset)[0]
+
+    @classmethod
+    def mate(cls, algae1: 'Algae', algae2: 'Algae'):
+        algae1.mated, algae2.mated = True, True
+        algae1.energy -= Algae.MATING_DRAIN
+        algae2.energy -= Algae.MATING_DRAIN
+        children = gp.cxOnePoint(copy.deepcopy(algae1.tree), copy.deepcopy(algae2.tree))
+        choice = random.randint(0, 1)
+        return Algae(algae1.world, pset=algae1.pset, tree=children[choice], center=algae1.rect.center)
 
     def _get_light_level(self, coords=None):
         if coords is None:
@@ -180,4 +200,7 @@ class Algae(pygame.sprite.Sprite):
             n.attr["label"] = labels[i]
 
         g.draw("tree.pdf")
+
+    def __repr__(self):
+        return f"<Algae {id(self)}>"
 
