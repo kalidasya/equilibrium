@@ -1,7 +1,7 @@
-import copy
-import operator
+import contextlib
 import random
 import sys
+import time
 
 import PIL.ImageColor
 import numpy as np
@@ -10,7 +10,7 @@ from PIL import Image, ImageOps
 from deap import base, tools, gp
 from perlin_numpy import generate_perlin_noise_2d, generate_fractal_noise_2d
 
-from creatures.algae import Algae, eval_algae
+import creatures
 
 SCREEN = 512, 512
 ALGAE_POPULATION = 200
@@ -56,11 +56,12 @@ def display_text(text, screen, pos):
     screen.blit(text, dest=pos)
 
 
-def vicinity_collision(left, right):
-    if left != right:
-        return left.mating_rect.colliderect(right.rect)
-    else:
-        return False
+@contextlib.contextmanager
+def timer(name):
+    tic = time.perf_counter()
+    yield
+    toc = time.perf_counter()
+    print(f"{name} took {toc - tic:0.4f}s")
 
 
 def main():
@@ -75,15 +76,15 @@ def main():
     world_surface = img_to_surface(world_img)
 
     all_sprites = pygame.sprite.Group()
-    all_algae = pygame.sprite.Group()
+    all_algae = creatures.AlgaeGroup()
     for _ in range(ALGAE_POPULATION):
-        algae = Algae(world_surface)
-        all_sprites.add(algae)
-        all_algae.add(algae)
+        a = creatures.Algae(world_surface)
+        all_sprites.add(a)
+        all_algae.add(a)
 
     gen = 0
     while True:
-        clock.tick(60)
+        clock.tick(25)
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
@@ -101,50 +102,33 @@ def main():
                         print(f"Color: {match.image.get_at((1,1))}")
                         match.save_tree()
 
-
-        # window.fill(0)
-        window.blit(world_surface, world_surface.get_rect(topleft=(0, 0)))
-        display_text(f"Algae count: {len(all_algae)}", window, pos=(0,0))
-        display_text(f"Generation count: {gen}", window, pos=(0, SCREEN[1] - 16))
-
-        for entity in all_algae:
-            res = eval_algae(entity.tree, entity.pset, entity)
-            tree = entity.mutate()
-            temp = entity.copy()
-            res2 = eval_algae(tree, entity.pset, temp)
-            # print(f"{res=} {res2=}")
-            if res2 > res:
-                entity.pset = temp.pset
-                entity.tree = temp.tree
-            temp.kill()
-
-            entity.fitness.values = entity.eval()
-            entity.update_color()
+        # eval
+        all_algae.eval_population()
 
         # die
-        dead_algae = [a for a in all_sprites if a.eval() == Algae.DEAD]
-        for algae in dead_algae:
-            algae.kill()
+        all_algae.reduce_population()
 
         # mate
-        possible_mates = pygame.sprite.groupcollide(
-            all_algae, all_algae, False, False,
-            collided=vicinity_collision)
-        possible_mates_sorted = sorted(list(possible_mates.keys()), key=lambda x: x.eval(), reverse=True)
-        for base in possible_mates_sorted:
-            mates = possible_mates[base]
-            if base.eval() > base.MATING_LIMIT and not base.mated:
-                possible_partners = sorted([p for p in mates if p.eval() > p.MATING_LIMIT and not p.mated], key=lambda x: x.eval(), reverse=True)
-                if possible_partners:
-                    child = Algae.mate(base, possible_partners[0])
-                    all_algae.add(child)
-                    all_sprites.add(child)
+        new_algae = all_algae.mate_population()
+        all_sprites.add(new_algae)
 
-        all_sprites.draw(window)
-        # print(len(all_sprites))
+        # mutate
+        for algae in all_algae:
+            if random.random() <= algae.MUTATION_CHANCE:
+                algae.mutate()
+
+        all_algae.reset_mated(10)
+
+        window.blit(world_surface, world_surface.get_rect(topleft=(0, 0)))
+        display_text(f"Algae count: {len(all_algae)}", window, pos=(0, 0))
+        display_text(f"Generation count: {gen}", window, pos=(0, SCREEN[1] - 16))
 
         gen += 1
-        pygame.display.flip()
+
+        # draw
+        with timer("drawing "):
+            all_sprites.draw(window)
+            pygame.display.flip()
 
 
 if __name__ == '__main__':

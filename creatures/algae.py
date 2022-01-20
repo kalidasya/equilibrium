@@ -8,10 +8,12 @@ import numpy as np
 import pygame
 from deap import gp, creator, base
 from deap.gp import PrimitiveTree
+from deap.tools import selection
 
 from utils import func
 from utils.ranged_number import RangedNumber
 
+# TODO this needs to go
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 
 
@@ -42,14 +44,16 @@ class Algae(pygame.sprite.Sprite):
     ROTATE_DRAIN = 1
     MOVE_DRAIN = 2
     PHOTOSYNTHESIS_GAIN = 100
-    MATING_DRAIN = 20
-    MATING_LIMIT = 50,
-
+    # MATING_DRAIN = 20
+    # MATING_LIMIT = 50,
+    MATING_CHANCE = .1
+    MUTATION_CHANCE = .1
+    CROWDED_THRESHOLD = 3
     DEAD = 0,
 
     fitness = creator.FitnessMax
 
-    def __init__(self, world: pygame.Surface, pset=None, tree=None, center=None):
+    def __init__(self, world: pygame.Surface, tree=None, center=None):
         super().__init__()
         self.world = world
         self.screen = self.world.get_size()
@@ -67,18 +71,11 @@ class Algae(pygame.sprite.Sprite):
         self.energy = RangedNumber(0, 100, 60)
         self.dir = random.randint(0, 3)
 
-        if pset is None:
-            self.pset = set_brain(self)
+        self.pset = set_brain(self)
+        if tree is None:
             self.tree = PrimitiveTree(self.expr_init())
         else:
-            self.pset = copy.deepcopy(pset)
-            for k, v in self.pset.context.items():
-                if f := getattr(self, k, None):
-                    self.pset.context[k] = f
-            # print(f"{str(self.pset)} {self.pset.context}")
-            self.tree = tree
-            if self.tree is None:
-                self.tree = PrimitiveTree(self.expr_init())
+            self.tree = copy.deepcopy(tree)
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -93,16 +90,17 @@ class Algae(pygame.sprite.Sprite):
         return gp.genFull(pset, min_=1, max_=2, type_=type_)
 
     def mutate(self):
-        return gp.mutUniform(self.tree, expr=self.expr_init, pset=self.pset)[0]
+        tree = gp.mutUniform(self.tree, expr=self.expr_init, pset=self.pset)
+        self.tree = tree[0]
 
     @classmethod
     def mate(cls, algae1: 'Algae', algae2: 'Algae'):
         algae1.mated, algae2.mated = True, True
-        algae1.energy -= Algae.MATING_DRAIN
-        algae2.energy -= Algae.MATING_DRAIN
         children = gp.cxOnePoint(copy.deepcopy(algae1.tree), copy.deepcopy(algae2.tree))
         choice = random.randint(0, 1)
-        return Algae(algae1.world, pset=algae1.pset, tree=children[choice], center=algae1.rect.center)
+        ret = Algae(algae1.world, tree=children[choice], center=algae1.rect.center)
+        ret.mated = True  # avoid immediate mating
+        return ret
 
     def _get_light_level(self, coords=None):
         if coords is None:
@@ -177,6 +175,16 @@ class Algae(pygame.sprite.Sprite):
     def if_wetter_ahead(self, out1, out2):
         return partial(func.if_then_else, self.wetter_ahead, out1, out2)
 
+    def can_mate(self, mates):
+        """
+        only mate if: mated flag is false
+        AND the possible mates are less than the crowded threshold (?)
+        AND the mating chance is hit
+        :param mates:
+        :return:
+        """
+        return not self.mated and 0 < len(mates) <= self.CROWDED_THRESHOLD and random.random() <= self.MATING_CHANCE
+
     def run(self, routine):
         routine()
 
@@ -204,3 +212,66 @@ class Algae(pygame.sprite.Sprite):
     def __repr__(self):
         return f"<Algae {id(self)}>"
 
+
+def vicinity_collision(left, right):
+    if left != right:
+        return left.mating_rect.colliderect(right.rect)
+    else:
+        return False
+
+
+class AlgaeGroup(pygame.sprite.Group):
+
+    def eval_population(self):
+        """
+        Evaluate and update all entities
+        :return:
+        """
+        for entity in self.sprites():
+            res = eval_algae(entity.tree, entity.pset, entity)
+            entity.fitness.values = res
+            entity.update_color()
+
+    def reduce_population(self):
+        """
+        Reduce population with the rule: entity evals to Algae.DEAD considered dead
+        :return:
+        """
+        dead_algae = [a for a in self.sprites() if a.eval() == Algae.DEAD]
+        for algae in dead_algae:
+            algae.kill()
+
+    def mate_population(self):
+        """
+        Mate the population aka create new entities if:
+        There are entities which are in close proximity
+        Algae.can_mate returned true
+        :return:
+        """
+        children = []
+        possible_mates = pygame.sprite.groupcollide(
+            self.sprites(), self.sprites(), False, False,
+            collided=vicinity_collision)
+
+        possible_mates_sorted = sorted(list(possible_mates.keys()), key=lambda x: x.eval(), reverse=True)
+        for base in possible_mates_sorted:
+            mates = sorted([p for p in possible_mates[base] if not p.mated], key=lambda x: x.eval(), reverse=True)
+            # print(len(mates))
+            if base.can_mate(mates):
+                # print("mating")
+                child = Algae.mate(base, mates[0])
+                children.append(child)
+                self.add(child)
+
+        return children
+
+    def reset_mated(self, k):
+        """
+        Reset k% of the mated entities to ready to be mated again
+        :param k:
+        :return:
+        """
+        # reset mated for .1 of the mated
+        ready_to_mate = [a for a in self.sprites() if a.mated]
+        for algae in selection.selRandom(ready_to_mate, k=len(ready_to_mate) // k):
+            algae.mated = False
