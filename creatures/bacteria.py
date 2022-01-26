@@ -10,9 +10,9 @@ from utils import func
 
 class Bacteria(base.Individual):
 
-    def __init__(self, world, config, tree=None, center=None, sprites=None):
+    def __init__(self, world, config, tree=None, center=None, individuals=None):
         super().__init__(world, config, tree=tree, center=center)
-        self.sprites = sprites
+        self.individuals = individuals
 
     @classmethod
     def set_brain(cls, bacteria):
@@ -25,24 +25,24 @@ class Bacteria(base.Individual):
         pset.addTerminal(bacteria.rotate_right)
         return pset
 
-    def update_color(self):
-        self.image.fill((255 - (100 - self.energy), 0, 0, 255))
+    def get_color(self):
+        return 255 - (100 - int(self.energy)), 0, 0, 255
 
     def eval(self):
         return self.energy
 
     def move(self):
         super().move()
-        food = pygame.sprite.spritecollideany(self, self.sprites)
+        food = pygame.sprite.spritecollideany(self, self.individuals)
         if food and not isinstance(food, Bacteria):
             food.kill()
             self.energy += 100
 
     def is_food_ahead(self):
-        rect_tmp = copy.deepcopy(self.rect)
-        self.rect.move_ip(self._get_move_vector())
-        food = pygame.sprite.spritecollideany(self, self.sprites)
-        self.rect = rect_tmp
+        tmp_sprite = pygame.sprite.Sprite()
+        tmp_sprite.rect = copy.deepcopy(self.rect)
+        tmp_sprite.rect.move_ip(self._get_move_vector())
+        food = pygame.sprite.spritecollideany(tmp_sprite, self.individuals)
         return bool(food)
 
     def if_food_ahead(self, out1, out2):
@@ -56,7 +56,7 @@ class Bacteria(base.Individual):
 
     def copy(self):
         ret = super().copy()
-        ret.sprites = self.sprites
+        ret.individuals = self.individuals
         return ret
 
     def __repr__(self):

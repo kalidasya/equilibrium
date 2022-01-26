@@ -23,20 +23,19 @@ class Algae(base.Individual):
 
     def _get_light_level(self, coords=None):
         if coords is None:
-            sun, *_ = self.world.get_at(self.rect.center)
-        else:
-            sun, *_ = self.world.get_at(coords)
+            coords = self.rect.center
+
+        sun = self.world.light[coords[0], coords[1]]
         return sun / 255
 
     def _get_water_level(self, coords=None):
         if coords is None:
-            _, _, water, _ = self.world.get_at(self.rect.center)
-        else:
-            _, _, water, _ = self.world.get_at(coords)
+            coords = self.rect.center
+        water = self.world.water[coords[0], coords[1]]
         return water / 255
 
-    def update_color(self):
-        self.image.fill((0, 255 - (100 - self.energy), 0, 255))
+    def get_color(self):
+        return 0, 255 - (100 - int(self.energy)), 0, 255
 
     def eval(self):
         return self.energy
