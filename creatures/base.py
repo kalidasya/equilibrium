@@ -1,8 +1,10 @@
 import copy
 import dataclasses
+import multiprocessing
 import operator
 import random
 
+import numpy as np
 import pygraphviz as pgv
 import pygame.sprite
 from deap import gp
@@ -16,6 +18,7 @@ limited_crossover = bloat_limiter(gp.cxOnePoint)
 limited_mutation = bloat_limiter(gp.mutUniform)
 
 
+# TODO subclass this
 @dataclasses.dataclass
 class IndividualConfig:
     width: int
@@ -26,29 +29,38 @@ class IndividualConfig:
     mating_percent: float
     mutation_chance: float
     crowded_threshold: int
+    population_limit: int
     reset_percent: float
     dead: int
     mating_rect_width: int
     mating_rect_height: int
+    hayflick_limit: int
+    food_sensing_distance: int = 0
+
+
+@dataclasses.dataclass
+class WorldResources:
+    water: np.array
+    light: np.array
+    width: int
+    height: int
 
 
 class Individual(pygame.sprite.Sprite):
-    def __init__(self, world: pygame.Surface, config: IndividualConfig, tree=None, center=None):
+    def __init__(self, world: WorldResources, config: IndividualConfig, tree=None, center=None):
         super().__init__()
 
         self.world = world
         self.config = config
         self.fissioned = False
         self.mated = False
-        self.screen = self.world.get_size()
-        self.image = pygame.Surface((self.config.width, self.config.height))
-        self.image.fill((0, 255, 0))
-        self.rect = self.image.get_rect()
+        self.age = 0
+        self.rect = pygame.Rect((0, 0, config.width, config.height))
         if center:
             self.rect.center = center
         else:
-            self.rect.center = (random.randint(self.config.width, self.screen[0] - self.config.width),
-                                random.randint(self.config.height, self.screen[1] - self.config.height))
+            self.rect.center = (random.randint(self.config.width, world.width - self.config.width),
+                                random.randint(self.config.height, world.height - self.config.height))
         self.mating_rect = self.rect.inflate(self.config.mating_rect_width, self.config.mating_rect_height)
 
         self.energy = RangedNumber(0, 100, 60)
@@ -68,6 +80,8 @@ class Individual(pygame.sprite.Sprite):
     @classmethod
     def mate(cls, ind1: 'Individual', ind2: 'Individual'):
         ind1.mated, ind2.mated = True, True
+        ind1.age += 1
+        ind2.age += 1
         tree1, tree2 = limited_crossover(copy.deepcopy(ind1.tree), copy.deepcopy(ind2.tree))
         child1 = ind1.copy()
         child1.tree = tree1
@@ -83,7 +97,14 @@ class Individual(pygame.sprite.Sprite):
 
     def mutate(self):
         tree = limited_mutation(self.tree, expr=self.expr_init, pset=self.pset)
+        self.age += 1
         self.tree = tree[0]
+
+    def can_mate(self):
+        """
+        :return:
+        """
+        return not self.mated and self.age < self.config.hayflick_limit
 
     def rotate_left(self):
         self.energy -= self.config.rotate_drain
@@ -99,9 +120,9 @@ class Individual(pygame.sprite.Sprite):
         match self.dir:
             case 0 if current_pos[1] > self.config.height:
                 new_vector[1] -= self.config.height
-            case 1 if current_pos[0] < self.screen[0] - self.config.width:
+            case 1 if current_pos[0] < self.world.width - self.config.width:
                 new_vector[0] += self.config.width
-            case 2 if current_pos[1] < self.screen[1] - self.config.height:
+            case 2 if current_pos[1] < self.world.height - self.config.height:
                 new_vector[1] += self.config.height
             case 3 if current_pos[0] > self.config.width:
                 new_vector[0] -= self.config.width
@@ -112,9 +133,13 @@ class Individual(pygame.sprite.Sprite):
         move = self._get_move_vector()
         self.rect.move_ip(*move)
         self.mating_rect.move_ip(*move)
+        return move
 
     def run(self, routine):
         routine()
+
+    def eval(self):
+        return self.energy
 
     def save_tree(self):
         nodes, edges, labels = gp.graph(self.tree)
@@ -131,12 +156,13 @@ class Individual(pygame.sprite.Sprite):
         g.draw("tree.pdf")
 
 
-def eval_individual(tree, pset, entity):
+def eval_individual(ind):
     # Transform the tree expression to functional Python code
-    routine = gp.compile(tree, pset)
+    routine = gp.compile(ind.tree, ind.pset)
     # Run the generated routine
-    entity.run(routine)
-    return entity.eval()
+
+    ind.run(routine)
+    return ind
 
 
 def vicinity_collision(left, right):
@@ -146,7 +172,7 @@ def vicinity_collision(left, right):
         return False
 
 
-class Population(pygame.sprite.Group):
+class Population(list):
 
     def __init__(self, config):
         super().__init__()
@@ -157,9 +183,9 @@ class Population(pygame.sprite.Group):
         Evaluate and update all entities
         :return:
         """
-        for ind in self.sprites():
-            eval_individual(ind.tree, ind.pset, ind)
-            ind.update_color()
+        pool = multiprocessing.pool.ThreadPool()
+        new_population = pool.map(eval_individual, self, chunksize=500)
+        self[:] = new_population
 
     def grow_population(self):
         """
@@ -169,25 +195,26 @@ class Population(pygame.sprite.Group):
                 :return:
                 """
         children = []
-        if len(self.sprites()) > 1:
+        if 1 < len(self) < self.config.population_limit :
+            # TODO this is time consuming with a lot of sprites, maybe we should pick the top x% and try to mate those?
+            # maybe forget about proximity?
+            can_mate = filter(lambda a: a.can_mate(), self)
             possible_mates = pygame.sprite.groupcollide(
-                self.sprites(), self.sprites(), False, False,
+                can_mate, can_mate, False, False,
                 collided=vicinity_collision)
 
             mating_percent = self.config.mating_percent
-            possible_mates_sorted = sorted([i for i in possible_mates.keys() if i.can_mate()], key=lambda x: x.eval(), reverse=True)
+            possible_mates_sorted = sorted(possible_mates.keys(), key=lambda x: x.eval(), reverse=True)
             possible_mates_sorted = possible_mates_sorted[:int(len(possible_mates_sorted) * mating_percent)]
 
             for base in possible_mates_sorted:
-                mates = sorted([p for p in possible_mates[base] if not p.mated], key=lambda x: x.eval(), reverse=True)
-                if len(mates) < base.config.crowded_threshold:
-                    # print(len(mates))
-                    for partner in mates:
-                        if partner.can_mate():
-                            # print("mating")
-                            offsprings = base.mate(base, partner)
-                            children.extend(offsprings)
-                            self.add(offsprings)
+                mates = sorted([p for p in possible_mates[base] if not p.can_mate()], key=lambda x: x.eval(), reverse=True)
+                for partner in mates:
+                    if partner.can_mate():
+                        offsprings = base.mate(base, partner)
+                        children.extend(offsprings)
+                        self.extend(offsprings)
+                        break
 
         return children
 
@@ -196,9 +223,11 @@ class Population(pygame.sprite.Group):
         Reduce population with the rule: entity evals to entity.DEAD considered dead
         :return:
         """
-        dead_entities = [a for a in self.sprites() if a.eval() == a.config.dead]
+        dead_entities = [a for a in self if a.eval() == a.config.dead]
         for entity in dead_entities:
-            entity.kill()
+            self.remove(entity)
+
+        return dead_entities
 
     def reset_mated(self):
         """
@@ -207,11 +236,21 @@ class Population(pygame.sprite.Group):
         :return:
         """
         # reset mated for .1 of the mated
-        mated = [a for a in self.sprites() if a.mated]
+        mated = [a for a in self if a.mated]
         for ind in selection.selRandom(mated, k=int(len(mated) * self.config.reset_percent)):
             ind.mated = False
 
     def mutate_population(self):
-        for ind in self.sprites():
+        for ind in self:
             if random.random() <= ind.config.mutation_chance:
                 ind.mutate()
+
+    def as_group(self):
+        ret = pygame.sprite.Group()
+        for ind in self:
+            s = pygame.sprite.Sprite()
+            s.image = pygame.Surface((ind.config.width, ind.config.height))
+            s.image.fill(ind.get_color())
+            s.rect = ind.rect
+            ret.add(s)
+        return ret

@@ -1,6 +1,5 @@
 import contextlib
 import multiprocessing
-import random
 import sys
 import time
 
@@ -12,8 +11,7 @@ from deap.base import Toolbox
 from perlin_numpy import generate_perlin_noise_2d, generate_fractal_noise_2d
 
 import creatures
-from creatures import Algae, Bacteria
-from creatures.base import IndividualConfig
+from creatures.base import IndividualConfig, WorldResources
 
 SCREEN = 512, 512
 ALGAE_POPULATION = 200
@@ -30,9 +28,12 @@ def get_noise(res):
     return generate_fractal_noise_2d(SCREEN, res, 5)
 
 
+def noise_to_normalized_np(noise):
+    return ((noise + 1.0) / 2.0 * 255.0).astype(np.uint8)
+
+
 def noise_to_image(noise, color):
-    # print(dir(cm))
-    img = Image.fromarray(((noise + 1.0) / 2.0 * 255.0).astype(np.uint8), mode='L')
+    img = Image.fromarray(noise, mode='L')
     img = ImageOps.colorize(img, black='black', white=color)
     return img
 
@@ -71,10 +72,12 @@ def timer(name):
 
 def main():
     window, clock = init()
-    water = get_noise((2, 2))
-    water_img = noise_to_image(water, 'blue')
+    water = noise_to_normalized_np(get_noise((2, 2)))
+    light = noise_to_normalized_np(get_noise((4, 4)))
 
-    light = get_noise((4, 4))
+    world_config = WorldResources(height=SCREEN[1], width=SCREEN[0], water=water, light=light)
+
+    water_img = noise_to_image(water, 'blue')
     light_img = noise_to_image(light, 'red')
 
     world_img = Image.blend(water_img, light_img, alpha=.5)
@@ -86,40 +89,45 @@ def main():
         rotate_drain=1,
         move_drain=2,
         photosynthesis_gain=100,
-        mating_percent=.1,
+        mating_percent=.9,
         mutation_chance=.1,
         crowded_threshold=3,
-        reset_percent=.01,
+        population_limit=1000,
+        reset_percent=.3,
         dead=0,
         mating_rect_width=6,
-        mating_rect_height=6)
+        mating_rect_height=6,
+        hayflick_limit=50)
 
     bacteria_config = IndividualConfig(
         width=2,
         height=2,
-        rotate_drain=1,
+        rotate_drain=0,
         move_drain=2,
         photosynthesis_gain=100,
         mating_percent=.5,
-        mutation_chance=.1,
+        mutation_chance=.9,
         crowded_threshold=5,
-        reset_percent=.01,
+        population_limit=1000,
+        reset_percent=.1,
         dead=0,
         mating_rect_width=12,
-        mating_rect_height=12)
+        mating_rect_height=12,
+        food_sensing_distance=12,
+        hayflick_limit=50)
 
-    all_sprites = pygame.sprite.Group()
+    all_individuals = []
     all_algae = creatures.AlgaeGroup(config=algae_config)
     for _ in range(ALGAE_POPULATION):
-        a = creatures.Algae(world_surface, algae_config)
-        all_sprites.add(a)
-        all_algae.add(a)
+        a = creatures.Algae(world_config, algae_config)
+        all_algae.append(a)
+    all_individuals.extend(all_algae)
 
     all_bacteria = creatures.BacteriaGroup(config=bacteria_config)
     for _ in range(BACTERIA_POPULATION):
-        b = creatures.Bacteria(world_surface, bacteria_config, sprites=all_sprites)
-        all_bacteria.add(b)
-        all_sprites.add(b)
+        b = creatures.Bacteria(world_config, bacteria_config, individuals=all_individuals)
+        all_bacteria.append(b)
+    all_individuals.extend(all_bacteria)
 
     gen = 0
     while True:
@@ -133,12 +141,12 @@ def main():
                     pos = pygame.sprite.DirtySprite()
                     x, y = event.pos[0] - 2, event.pos[1] - 2
                     pos.rect = pygame.Rect(x, y, 4, 4)
-                    match = pygame.sprite.spritecollideany(pos, all_sprites)
+                    match = pygame.sprite.spritecollideany(pos, all_individuals)
                     if match:
                         world = world_surface.get_at(match.rect.center)
-                        print(f"{match.energy}")
                         print(f"Sun: {world[0] / 255} Water: {world[2] / 255}")
-                        print(f"Color: {match.image.get_at((1,1))}")
+                        print(f"Value: {match.eval()}")
+                        print(f"Dead?: {match.eval() == match.config.dead}")
                         match.save_tree()
 
         with timer("eval "):
@@ -146,17 +154,27 @@ def main():
             all_algae.eval()
             all_bacteria.eval()
 
+        with timer("carn has eaten "):
+            food = pygame.sprite.groupcollide(all_bacteria, all_algae, False, False)
+            for _, algaes in food.items():
+                for algae in algaes:
+                    if algae in all_algae:
+                        all_algae.remove(algae)
+                        all_individuals.remove(algae)
+
         with timer("die "):
             # die
-            all_algae.reduce_population()
+            dead_algae = all_algae.reduce_population()
+            map(lambda d: all_individuals.remove(d), dead_algae)
             all_bacteria.reduce_population()
+            map(lambda d: all_individuals.remove(d), dead_algae)
 
         with timer("mate "):
             # mate
             new_algae = all_algae.grow_population()
-            all_sprites.add(new_algae)
+            all_individuals.extend(new_algae)
             new_bacteria = all_bacteria.grow_population()
-            all_sprites.add(new_bacteria)
+            all_individuals.extend(new_bacteria)
 
         with timer("mutate "):
             # mutate
@@ -177,7 +195,9 @@ def main():
 
         # draw
         with timer("drawing "):
-            all_sprites.draw(window)
+            g = all_algae.as_group()
+            g.draw(window)
+            all_bacteria.as_group().draw(window)
             pygame.display.flip()
 
 
