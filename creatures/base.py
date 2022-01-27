@@ -85,9 +85,11 @@ class Individual(pygame.sprite.Sprite):
         tree1, tree2 = limited_crossover(copy.deepcopy(ind1.tree), copy.deepcopy(ind2.tree))
         child1 = ind1.copy()
         child1.tree = tree1
+        child1.mated = True
 
         child2 = ind2.copy()
         child2.tree = tree1
+        child2.mated = True
         return child1, child2
 
     def expr_init(self, pset=None, type_=None):
@@ -198,7 +200,7 @@ class Population(list):
         if 1 < len(self) < self.config.population_limit :
             # TODO this is time consuming with a lot of sprites, maybe we should pick the top x% and try to mate those?
             # maybe forget about proximity?
-            can_mate = filter(lambda a: a.can_mate(), self)
+            can_mate = list(filter(lambda a: a.can_mate(), self))
             possible_mates = pygame.sprite.groupcollide(
                 can_mate, can_mate, False, False,
                 collided=vicinity_collision)
@@ -206,15 +208,16 @@ class Population(list):
             mating_percent = self.config.mating_percent
             possible_mates_sorted = sorted(possible_mates.keys(), key=lambda x: x.eval(), reverse=True)
             possible_mates_sorted = possible_mates_sorted[:int(len(possible_mates_sorted) * mating_percent)]
+            print(len(possible_mates))
 
             for base in possible_mates_sorted:
-                mates = sorted([p for p in possible_mates[base] if not p.can_mate()], key=lambda x: x.eval(), reverse=True)
+                mates = sorted([p for p in possible_mates[base] if p.can_mate()], key=lambda x: x.eval(), reverse=True)
+                # this is like an if, mates can be emtpy
                 for partner in mates:
-                    if partner.can_mate():
-                        offsprings = base.mate(base, partner)
-                        children.extend(offsprings)
-                        self.extend(offsprings)
-                        break
+                    offsprings = base.mate(base, partner)
+                    children.extend(offsprings)
+                    self.extend(offsprings)
+                    break
 
         return children
 

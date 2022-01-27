@@ -89,15 +89,15 @@ def main():
         rotate_drain=1,
         move_drain=2,
         photosynthesis_gain=100,
-        mating_percent=.9,
+        mating_percent=.3,
         mutation_chance=.1,
         crowded_threshold=3,
         population_limit=1000,
-        reset_percent=.3,
+        reset_percent=.1,
         dead=0,
         mating_rect_width=6,
         mating_rect_height=6,
-        hayflick_limit=50)
+        hayflick_limit=10)
 
     bacteria_config = IndividualConfig(
         width=2,
@@ -105,8 +105,8 @@ def main():
         rotate_drain=0,
         move_drain=2,
         photosynthesis_gain=100,
-        mating_percent=.5,
-        mutation_chance=.9,
+        mating_percent=.3,
+        mutation_chance=.1,
         crowded_threshold=5,
         population_limit=1000,
         reset_percent=.1,
@@ -114,7 +114,7 @@ def main():
         mating_rect_width=12,
         mating_rect_height=12,
         food_sensing_distance=12,
-        hayflick_limit=50)
+        hayflick_limit=10)
 
     all_individuals = []
     all_algae = creatures.AlgaeGroup(config=algae_config)
