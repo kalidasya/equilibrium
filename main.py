@@ -33,7 +33,6 @@ def noise_to_normalized_np(noise):
 
 
 def noise_to_image(noise, color):
-    # print(dir(cm))
     img = Image.fromarray(noise, mode='L')
     img = ImageOps.colorize(img, black='black', white=color)
     return img
@@ -90,44 +89,44 @@ def main():
         rotate_drain=1,
         move_drain=2,
         photosynthesis_gain=100,
-        mating_percent=.1,
+        mating_percent=.9,
         mutation_chance=.1,
         crowded_threshold=3,
         population_limit=1000,
-        reset_percent=.01,
+        reset_percent=.3,
         dead=0,
         mating_rect_width=6,
-        mating_rect_height=6)
+        mating_rect_height=6,
+        hayflick_limit=50)
 
     bacteria_config = IndividualConfig(
         width=2,
         height=2,
-        rotate_drain=1,
+        rotate_drain=0,
         move_drain=2,
         photosynthesis_gain=100,
         mating_percent=.5,
-        mutation_chance=.1,
+        mutation_chance=.9,
         crowded_threshold=5,
         population_limit=1000,
-        reset_percent=.01,
+        reset_percent=.1,
         dead=0,
         mating_rect_width=12,
-        mating_rect_height=12)
+        mating_rect_height=12,
+        food_sensing_distance=12,
+        hayflick_limit=50)
 
-    # all_sprites = pygame.sprite.Group()
     all_individuals = []
     all_algae = creatures.AlgaeGroup(config=algae_config)
     for _ in range(ALGAE_POPULATION):
         a = creatures.Algae(world_config, algae_config)
-        # all_sprites.add(a)
         all_algae.append(a)
     all_individuals.extend(all_algae)
 
     all_bacteria = creatures.BacteriaGroup(config=bacteria_config)
     for _ in range(BACTERIA_POPULATION):
-        b = creatures.Bacteria(world_config, bacteria_config, individuals=all_algae)
+        b = creatures.Bacteria(world_config, bacteria_config, individuals=all_individuals)
         all_bacteria.append(b)
-        # all_sprites.add(b)
     all_individuals.extend(all_bacteria)
 
     gen = 0
@@ -155,10 +154,20 @@ def main():
             all_algae.eval()
             all_bacteria.eval()
 
+        with timer("carn has eaten "):
+            food = pygame.sprite.groupcollide(all_bacteria, all_algae, False, False)
+            for _, algaes in food.items():
+                for algae in algaes:
+                    if algae in all_algae:
+                        all_algae.remove(algae)
+                        all_individuals.remove(algae)
+
         with timer("die "):
             # die
-            all_algae.reduce_population()
+            dead_algae = all_algae.reduce_population()
+            map(lambda d: all_individuals.remove(d), dead_algae)
             all_bacteria.reduce_population()
+            map(lambda d: all_individuals.remove(d), dead_algae)
 
         with timer("mate "):
             # mate

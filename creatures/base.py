@@ -18,6 +18,7 @@ limited_crossover = bloat_limiter(gp.cxOnePoint)
 limited_mutation = bloat_limiter(gp.mutUniform)
 
 
+# TODO subclass this
 @dataclasses.dataclass
 class IndividualConfig:
     width: int
@@ -33,6 +34,8 @@ class IndividualConfig:
     dead: int
     mating_rect_width: int
     mating_rect_height: int
+    hayflick_limit: int
+    food_sensing_distance: int = 0
 
 
 @dataclasses.dataclass
@@ -51,6 +54,7 @@ class Individual(pygame.sprite.Sprite):
         self.config = config
         self.fissioned = False
         self.mated = False
+        self.age = 0
         self.rect = pygame.Rect((0, 0, config.width, config.height))
         if center:
             self.rect.center = center
@@ -76,6 +80,8 @@ class Individual(pygame.sprite.Sprite):
     @classmethod
     def mate(cls, ind1: 'Individual', ind2: 'Individual'):
         ind1.mated, ind2.mated = True, True
+        ind1.age += 1
+        ind2.age += 1
         tree1, tree2 = limited_crossover(copy.deepcopy(ind1.tree), copy.deepcopy(ind2.tree))
         child1 = ind1.copy()
         child1.tree = tree1
@@ -91,7 +97,14 @@ class Individual(pygame.sprite.Sprite):
 
     def mutate(self):
         tree = limited_mutation(self.tree, expr=self.expr_init, pset=self.pset)
+        self.age += 1
         self.tree = tree[0]
+
+    def can_mate(self):
+        """
+        :return:
+        """
+        return not self.mated and self.age < self.config.hayflick_limit
 
     def rotate_left(self):
         self.energy -= self.config.rotate_drain
@@ -120,9 +133,13 @@ class Individual(pygame.sprite.Sprite):
         move = self._get_move_vector()
         self.rect.move_ip(*move)
         self.mating_rect.move_ip(*move)
+        return move
 
     def run(self, routine):
         routine()
+
+    def eval(self):
+        return self.energy
 
     def save_tree(self):
         nodes, edges, labels = gp.graph(self.tree)
@@ -181,16 +198,17 @@ class Population(list):
         if 1 < len(self) < self.config.population_limit :
             # TODO this is time consuming with a lot of sprites, maybe we should pick the top x% and try to mate those?
             # maybe forget about proximity?
+            can_mate = filter(lambda a: a.can_mate(), self)
             possible_mates = pygame.sprite.groupcollide(
-                self, self, False, False,
+                can_mate, can_mate, False, False,
                 collided=vicinity_collision)
 
             mating_percent = self.config.mating_percent
-            possible_mates_sorted = sorted([i for i in possible_mates.keys() if i.can_mate()], key=lambda x: x.eval(), reverse=True)
+            possible_mates_sorted = sorted(possible_mates.keys(), key=lambda x: x.eval(), reverse=True)
             possible_mates_sorted = possible_mates_sorted[:int(len(possible_mates_sorted) * mating_percent)]
 
             for base in possible_mates_sorted:
-                mates = sorted([p for p in possible_mates[base] if not p.mated], key=lambda x: x.eval(), reverse=True)
+                mates = sorted([p for p in possible_mates[base] if not p.can_mate()], key=lambda x: x.eval(), reverse=True)
                 for partner in mates:
                     if partner.can_mate():
                         offsprings = base.mate(base, partner)
@@ -208,6 +226,8 @@ class Population(list):
         dead_entities = [a for a in self if a.eval() == a.config.dead]
         for entity in dead_entities:
             self.remove(entity)
+
+        return dead_entities
 
     def reset_mated(self):
         """

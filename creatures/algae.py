@@ -37,9 +37,6 @@ class Algae(base.Individual):
     def get_color(self):
         return 0, 255 - (100 - int(self.energy)), 0, 255
 
-    def eval(self):
-        return self.energy
-
     def photosynthesize(self):
         efficiency = min(self._get_light_level(), self._get_water_level())
         # print(f"Gaining {int(self.PHOTOSYNTHESIS_GAIN * efficiency)} energy with {efficiency=}")
@@ -64,12 +61,6 @@ class Algae(base.Individual):
 
     def if_wetter_ahead(self, out1, out2):
         return partial(func.if_then_else, self.wetter_ahead, out1, out2)
-
-    def can_mate(self):
-        """
-        :return:
-        """
-        return not self.mated
 
     def __repr__(self):
         return f"<Algae {id(self)}>"
