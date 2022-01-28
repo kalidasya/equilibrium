@@ -1,10 +1,12 @@
 import copy
+import dataclasses
 from functools import partial
 
 import pygame
 from deap import gp
 
 from creatures import base
+from creatures.base import IndividualConfig
 from utils import func
 
 
@@ -13,6 +15,12 @@ def food_sensor_collision(left, right):
         return left.food_sensor_rect.colliderect(right.rect)
     else:
         return False
+
+
+@dataclasses.dataclass
+class BacteriaConfig(IndividualConfig):
+    food_sensing_distance: int
+
 
 
 class Bacteria(base.Individual):

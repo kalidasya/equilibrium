@@ -11,6 +11,8 @@ from deap.base import Toolbox
 from perlin_numpy import generate_perlin_noise_2d, generate_fractal_noise_2d
 
 import creatures
+from creatures.algae import AlgaeConfig
+from creatures.bacteria import BacteriaConfig
 from creatures.base import IndividualConfig, WorldResources
 
 SCREEN = 512, 512
@@ -83,7 +85,7 @@ def main():
     world_img = Image.blend(water_img, light_img, alpha=.5)
     world_surface = img_to_surface(world_img)
 
-    algae_config = IndividualConfig(
+    algae_config = AlgaeConfig(
         width=2,
         height=2,
         rotate_drain=1,
@@ -99,12 +101,11 @@ def main():
         mating_rect_height=6,
         hayflick_limit=10)
 
-    bacteria_config = IndividualConfig(
+    bacteria_config = BacteriaConfig(
         width=2,
         height=2,
         rotate_drain=0,
         move_drain=2,
-        photosynthesis_gain=100,
         mating_percent=.3,
         mutation_chance=.1,
         crowded_threshold=5,

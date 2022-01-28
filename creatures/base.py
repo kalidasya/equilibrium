@@ -18,14 +18,12 @@ limited_crossover = bloat_limiter(gp.cxOnePoint)
 limited_mutation = bloat_limiter(gp.mutUniform)
 
 
-# TODO subclass this
 @dataclasses.dataclass
 class IndividualConfig:
     width: int
     height: int
     rotate_drain: int
     move_drain: int
-    photosynthesis_gain: int
     mating_percent: float
     mutation_chance: float
     crowded_threshold: int
@@ -35,7 +33,6 @@ class IndividualConfig:
     mating_rect_width: int
     mating_rect_height: int
     hayflick_limit: int
-    food_sensing_distance: int = 0
 
 
 @dataclasses.dataclass
@@ -46,10 +43,8 @@ class WorldResources:
     height: int
 
 
-class Individual(pygame.sprite.Sprite):
+class Individual():
     def __init__(self, world: WorldResources, config: IndividualConfig, tree=None, center=None):
-        super().__init__()
-
         self.world = world
         self.config = config
         self.fissioned = False
@@ -208,7 +203,6 @@ class Population(list):
             mating_percent = self.config.mating_percent
             possible_mates_sorted = sorted(possible_mates.keys(), key=lambda x: x.eval(), reverse=True)
             possible_mates_sorted = possible_mates_sorted[:int(len(possible_mates_sorted) * mating_percent)]
-            print(len(possible_mates))
 
             for base in possible_mates_sorted:
                 mates = sorted([p for p in possible_mates[base] if p.can_mate()], key=lambda x: x.eval(), reverse=True)

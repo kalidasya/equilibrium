@@ -1,10 +1,17 @@
+import dataclasses
 from functools import partial
 
 import numpy as np
 from deap import gp
 
 from creatures import base
+from creatures.base import IndividualConfig
 from utils import func
+
+
+@dataclasses.dataclass
+class AlgaeConfig(IndividualConfig):
+    photosynthesis_gain: int
 
 
 class Algae(base.Individual):
