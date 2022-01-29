@@ -2,16 +2,23 @@ import dataclasses
 from functools import partial
 
 import numpy as np
+import pygame
 from deap import gp
 
 from creatures import base
-from creatures.base import IndividualConfig
+from creatures.base import IndividualConfig, IndividualMenu
 from utils import func
 
 
 @dataclasses.dataclass
 class AlgaeConfig(IndividualConfig):
     photosynthesis_gain: int
+
+
+class AlgaeMenu(IndividualMenu):
+
+    def _draw(self, pos):
+        pos += self._input2("Photosynthesis gain", pygame.Rect((0, pos), (self.width, self.row_height)), "photosynthesis_gain")
 
 
 class Algae(base.Individual):
@@ -42,12 +49,12 @@ class Algae(base.Individual):
         return water / 255
 
     def get_color(self):
-        return 0, 255 - (100 - int(self.energy)), 0, 255
+        return 0, 255 - int(self.config.max_energy - self.energy), 0, 255
 
     def photosynthesize(self):
         efficiency = min(self._get_light_level(), self._get_water_level())
         # print(f"Gaining {int(self.PHOTOSYNTHESIS_GAIN * efficiency)} energy with {efficiency=}")
-        self.energy += int(self.config.photosynthesis_gain * efficiency)
+        self._inc_energy(self.config.photosynthesis_gain * efficiency)
 
     def lighter_ahead(self):
         target_coords = np.add(self.rect.center, self._get_move_vector())

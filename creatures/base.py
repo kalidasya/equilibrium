@@ -1,17 +1,17 @@
 import copy
 import dataclasses
-import multiprocessing
 import operator
 import random
+from multiprocessing.pool import ThreadPool
 
 import numpy as np
+import pygame_gui
 import pygraphviz as pgv
 import pygame.sprite
 from deap import gp
 from deap.gp import PrimitiveTree
 from deap.tools import selection
 
-from utils.ranged_number import RangedNumber
 
 bloat_limiter = gp.staticLimit(operator.attrgetter('height'), 17)
 limited_crossover = bloat_limiter(gp.cxOnePoint)
@@ -33,6 +33,16 @@ class IndividualConfig:
     mating_rect_width: int
     mating_rect_height: int
     hayflick_limit: int
+    max_energy: int
+
+
+@dataclasses.dataclass
+class GameConfig:
+    algae_population: int
+    bacteria_population: int
+    generation: int
+    game_speed: int
+    paused: bool
 
 
 @dataclasses.dataclass
@@ -41,6 +51,228 @@ class WorldResources:
     light: np.array
     width: int
     height: int
+
+
+class BottomPanel:
+    def __init__(self, label, config: GameConfig, manager, menu_pos):
+        self.manager = manager
+        self.panel = pygame_gui.elements.UIPanel(
+            starting_layer_height=1,
+            relative_rect=menu_pos,
+            manager=manager)
+        self.config = config
+        self.width = self.panel.rect.width
+        self.row_height = 25
+        self.algae_count = None
+        self.bacteria_count = None
+        self.generation_count = None
+        self.inputs = {}
+
+    def draw(self):
+        rect = pygame.Rect((0, 0), (self.width // 4, self.row_height))
+        pygame_gui.elements.UILabel(
+            relative_rect=rect,
+            text="Algae count:",
+            manager=self.manager,
+            container=self.panel,
+        )
+        self.algae_count = pygame_gui.elements.UILabel(
+            relative_rect=rect.move(self.width // 4, 0),
+            text=str(self.config.algae_population),
+            manager=self.manager,
+            container=self.panel,
+        )
+        pygame_gui.elements.UILabel(
+            relative_rect=rect.move(self.width // 4 * 2, 0),
+            text="Bacteria count:",
+            manager=self.manager,
+            container=self.panel,
+        )
+        self.bacteria_count = pygame_gui.elements.UILabel(
+            relative_rect=rect.move(self.width // 4 * 3, 0),
+            text=str(self.config.bacteria_population),
+            manager=self.manager,
+            container=self.panel,
+        )
+
+        rect = pygame.Rect((0, self.row_height), (self.width // 3, self.row_height))
+        p = pygame_gui.elements.UILabel(
+            relative_rect=rect,
+            text="Gen count:",
+            manager=self.manager,
+            container=self.panel,
+        )
+        p.text_horiz_alignment = 'left'
+
+        self.generation_count = pygame_gui.elements.UILabel(
+            relative_rect=rect.move(self.width // 3, 0),
+            text=str(self.config.generation),
+            manager=self.manager,
+            container=self.panel,
+        )
+        self.generation_count.text_horiz_alignment = 'left'
+
+        # rect = pygame.Rect((0, self.row_height * 2), (self.width // 3, self.row_height))
+        # p = pygame_gui.elements.UILabel(
+        #     relative_rect=rect,
+        #     text="Game speed:",
+        #     manager=self.manager,
+        #     container=self.panel,
+        # )
+        # p.text_horiz_alignment = 'left'
+        # game_speed = pygame_gui.elements.UIHorizontalSlider(
+        #     relative_rect=rect.move(self.width // 3, 0),
+        #     start_value=self.config.game_speed,
+        #     value_range=range(1, 60),
+        #     manager=self.manager,
+        #     container=self.panel,
+        # )
+        # game_speed.i_type = int
+        # self.inputs[game_speed] = "game_speed"
+
+        rect = pygame.Rect((self.width // 3 * 2, self.row_height), (self.width // 3, self.row_height * 2))
+        paused = pygame_gui.elements.UIButton(
+            relative_rect=rect,
+            text="Play/Pause",
+            manager=self.manager,
+            container=self.panel,
+        )
+        paused.text_horiz_alignment = "left"
+        self.inputs[paused] = "paused"
+
+    def set_config_for_element(self, element, value=None):
+        for elem, config_name in self.inputs.items():
+            if elem == element:
+                if value is None:
+                    print("WQEWQE")
+                    setattr(self.config, config_name, not getattr(self.config, config_name))
+                else:
+                    setattr(self.config, config_name, elem.i_type(value))
+
+
+class IndividualMenu:
+
+    def __init__(self, label, config: IndividualConfig, manager, menu_pos):
+        self.config = config
+        self.manager = manager
+        self.panel = pygame_gui.elements.UIPanel(
+            starting_layer_height=1,
+            relative_rect=menu_pos,
+            manager=manager)
+        self.width = self.panel.rect.width
+        self.half_width = self.width // 2 - 2
+        self.row_height = 25
+        self.label = label
+        self.inputs = {}
+
+    def _input(self, label, rect:pygame.Rect, config_name):
+        label = pygame_gui.elements.UILabel(
+            relative_rect=rect,
+            text=label,
+            manager=self.manager,
+            container=self.panel,
+        )
+        entry = pygame_gui.elements.UITextEntryLine(
+            relative_rect=rect.move(label.rect.width, 0),
+            manager=self.manager,
+            container=self.panel,
+        )
+        entry.i_type = int
+        entry.set_text(str(getattr(self.config, config_name)))
+        self.inputs[entry] = config_name
+        return self.row_height
+
+    def _input2(self, label, rect:pygame.Rect, config_name):
+        label = pygame_gui.elements.UILabel(
+            relative_rect=rect,
+            text=label,
+            manager=self.manager,
+            container=self.panel,
+        )
+        entry = pygame_gui.elements.UITextEntryLine(
+            relative_rect=rect.move(0, self.row_height),
+            manager=self.manager,
+            container=self.panel,
+        )
+        entry.i_type = int
+        entry.set_text(str(getattr(self.config, config_name)))
+        self.inputs[entry] = config_name
+        return self.row_height * 2
+
+    def _slider(self, label, rect:pygame.Rect, config_name):
+        label = pygame_gui.elements.UILabel(
+            relative_rect=rect,
+            text=label,
+            manager=self.manager,
+            container=self.panel,
+        )
+        entry = pygame_gui.elements.UIHorizontalSlider(
+            relative_rect=rect.move(0, self.row_height),
+            manager=self.manager,
+            container=self.panel,
+            value_range=(0, 1),
+            start_value=getattr(self.config, config_name)
+        )
+        entry.i_type = float
+        self.inputs[entry] = config_name
+        return self.row_height * 2
+
+    def _multi_input(self, label, start_pos, config_name1, config_name2):
+        label = pygame_gui.elements.UILabel(
+            relative_rect=pygame.Rect(start_pos, (self.width, self.row_height)),
+            text=label,
+            manager=self.manager,
+            container=self.panel,
+        )
+        rect = pygame.Rect(start_pos, (self.half_width, self.row_height))
+        entry1 = pygame_gui.elements.UITextEntryLine(
+            relative_rect=rect.move(0, self.row_height),
+            manager=self.manager,
+            container=self.panel,
+        )
+        entry1.i_type = int
+        entry1.set_text(str(getattr(self.config, config_name1)))
+        self.inputs[entry1] = config_name1
+        entry2 = pygame_gui.elements.UITextEntryLine(
+            relative_rect=rect.move(self.half_width, self.row_height),
+            manager=self.manager,
+            container=self.panel,
+        )
+        entry2.i_type = int
+        entry2.set_text(str(getattr(self.config, config_name2)))
+        self.inputs[entry2] = config_name2
+        return self.row_height * 2
+
+    def draw(self):
+        pos = 0
+        pygame_gui.elements.UILabel(
+            relative_rect=pygame.Rect((0, pos), (self.width, self.row_height)),
+            text=self.label,
+            manager=self.manager,
+            container=self.panel,
+        )
+        pos += self.row_height
+        pos += self._input("Width", pygame.Rect((0, pos), (self.half_width, self.row_height)), "width")
+        pos += self._input("Height", pygame.Rect((0, pos), (self.half_width, self.row_height)), "height")
+        pos += self._input("Rot -", pygame.Rect((0, pos), (self.half_width, self.row_height)), "rotate_drain")
+        pos += self._input("Move -", pygame.Rect((0, pos), (self.half_width, self.row_height)), "move_drain")
+        pos += self._input("Max energy", pygame.Rect((0, pos), (self.half_width, self.row_height)), "max_energy")
+        pos += self._input("Dead", pygame.Rect((0, pos), (self.half_width, self.row_height)), "dead")
+        pos += self._input2("Crowded threshold", pygame.Rect((0, pos), (self.width, self.row_height)), "crowded_threshold")
+        pos += self._input2("Hayflick limit", pygame.Rect((0, pos), (self.width, self.row_height)), "hayflick_limit")
+        pos += self._slider("Mating%", pygame.Rect((0, pos), (self.width, self.row_height)), "mating_percent")
+        pos += self._slider("Mutation%", pygame.Rect((0, pos), (self.width, self.row_height)), "mutation_chance")
+        pos += self._slider("Reset%", pygame.Rect((0, pos), (self.width, self.row_height)), "reset_percent")
+        pos += self._multi_input("Mating rect w x h", (0, pos),
+                           "mating_rect_width", "mating_rect_height")
+
+        self._draw(pos)
+        return pos
+
+    def set_config_for_element(self, element, value):
+        for elem, config_name in self.inputs.items():
+            if elem == element:
+                setattr(self.config, config_name, elem.i_type(value))
 
 
 class Individual():
@@ -58,7 +290,7 @@ class Individual():
                                 random.randint(self.config.height, world.height - self.config.height))
         self.mating_rect = self.rect.inflate(self.config.mating_rect_width, self.config.mating_rect_height)
 
-        self.energy = RangedNumber(0, 100, 60)
+        self.energy = self.config.max_energy
         self.dir = random.randint(0, 3)
 
         self.pset = self.set_brain(self)
@@ -66,6 +298,16 @@ class Individual():
             self.tree = PrimitiveTree(self.expr_init())
         else:
             self.tree = copy.deepcopy(tree)
+
+    def _dec_energy(self, val):
+        self.energy -= val
+        if self.energy < 0:
+            self.energy = 0
+
+    def _inc_energy(self, val):
+        self.energy += val
+        if self.energy > self.config.max_energy:
+            self.energy = self.config.max_energy
 
     def copy(self):
         ret = self.__class__(world=self.world, config=self.config, tree=self.tree, center=self.rect.center)
@@ -104,11 +346,11 @@ class Individual():
         return not self.mated and self.age < self.config.hayflick_limit
 
     def rotate_left(self):
-        self.energy -= self.config.rotate_drain
+        self._dec_energy(self.config.rotate_drain)
         self.dir = (self.dir - 1) % 4
 
     def rotate_right(self):
-        self.energy -= self.config.rotate_drain
+        self._dec_energy(self.config.rotate_drain)
         self.dir = (self.dir + 1) % 4
 
     def _get_move_vector(self):
@@ -126,7 +368,7 @@ class Individual():
         return new_vector
 
     def move(self):
-        self.energy -= self.config.move_drain
+        self._dec_energy(self.config.move_drain)
         move = self._get_move_vector()
         self.rect.move_ip(*move)
         self.mating_rect.move_ip(*move)
@@ -180,7 +422,7 @@ class Population(list):
         Evaluate and update all entities
         :return:
         """
-        pool = multiprocessing.pool.ThreadPool()
+        pool = ThreadPool()
         new_population = pool.map(eval_individual, self, chunksize=500)
         self[:] = new_population
 
@@ -208,6 +450,8 @@ class Population(list):
                 mates = sorted([p for p in possible_mates[base] if p.can_mate()], key=lambda x: x.eval(), reverse=True)
                 # this is like an if, mates can be emtpy
                 for partner in mates:
+                    if base.age > 10 or partner.age > 10:
+                        print("ARENT WE OLD???")
                     offsprings = base.mate(base, partner)
                     children.extend(offsprings)
                     self.extend(offsprings)
@@ -220,7 +464,8 @@ class Population(list):
         Reduce population with the rule: entity evals to entity.DEAD considered dead
         :return:
         """
-        dead_entities = [a for a in self if a.eval() == a.config.dead]
+
+        dead_entities = [a for a in self if a.eval() <= a.config.dead]
         for entity in dead_entities:
             self.remove(entity)
 
