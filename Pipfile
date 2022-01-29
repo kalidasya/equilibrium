@@ -8,6 +8,7 @@ pygame = "*"
 matplotlib = "*"
 numpy = "*"
 perlin-numpy = {git = "https://github.com/pvigier/perlin-numpy"}
+pygame-gui = "*"
 
 [dev-packages]
 

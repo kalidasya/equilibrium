@@ -6,7 +6,7 @@ import pygame
 from deap import gp
 
 from creatures import base
-from creatures.base import IndividualConfig
+from creatures.base import IndividualConfig, IndividualMenu
 from utils import func
 
 
@@ -20,6 +20,12 @@ def food_sensor_collision(left, right):
 @dataclasses.dataclass
 class BacteriaConfig(IndividualConfig):
     food_sensing_distance: int
+
+
+class BacteriaMenu(IndividualMenu):
+
+    def _draw(self, pos):
+        pos += self._input2("Food sensing distance", pygame.Rect((0, pos), (self.width, self.row_height)), "food_sensing_distance")
 
 
 
@@ -51,7 +57,7 @@ class Bacteria(base.Individual):
         foods = pygame.sprite.spritecollide(self, self.individuals, False)
         for food in foods:
             if food and not isinstance(food, Bacteria):
-                self.energy += 100
+                self._inc_energy(100)
                 break
 
     def rotate_right(self):
