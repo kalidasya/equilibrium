@@ -9,6 +9,8 @@ import pygame
 import pygame_gui
 from PIL import Image, ImageOps
 from perlin_numpy import generate_perlin_noise_2d, generate_fractal_noise_2d
+from pygame_gui.windows import UIMessageWindow
+from yapf.yapflib.yapf_api import FormatCode
 
 import creatures
 from creatures.algae import AlgaeConfig, AlgaeMenu
@@ -67,7 +69,7 @@ def init(game_config, algae_config, bacteria_config):
     background = pygame.Surface(APP_SIZE)
     background.fill(pygame.Color('#330033'))
 
-    manager = pygame_gui.UIManager(APP_SIZE)
+    manager = pygame_gui.UIManager(APP_SIZE, 'theme.json', starting_language='en', translation_directory_paths=['data/translations'])
     menu_width = (APP_SIZE[0] - WORLD_SIZE[0]) // 2
 
     algae_menu = AlgaeMenu("ALGAES", algae_config, manager, pygame.Rect((0, 0), (menu_width, APP_SIZE[1])))
@@ -134,7 +136,7 @@ def main():
         hayflick_limit=10)
 
     game_config = GameConfig(
-        game_speed=25,
+        game_speed=10,
         algae_population=ALGAE_POPULATION,
         bacteria_population=BACTERIA_POPULATION,
         paused=False,
@@ -166,6 +168,8 @@ def main():
         all_bacteria.append(b)
     all_individuals.extend(all_bacteria)
 
+    popup = None
+
     while True:
         for event in pygame.event.get():
             match event.type:
@@ -182,21 +186,33 @@ def main():
                     display.bottom_panel.set_config_for_element(event.ui_element, event.value)
                 case pygame_gui.UI_BUTTON_PRESSED:
                     display.bottom_panel.set_config_for_element(event.ui_element)
-                case pygame.MOUSEBUTTONUP:
+                case pygame_gui.UI_BUTTON_ON_HOVERED:
+                    print(event.ui_element)
+                case pygame.KEYUP if event.key == pygame.K_SPACE:
+                    game_config.paused = not game_config.paused
+                case pygame.MOUSEBUTTONUP if popup is None or not popup.alive():
                     pos = pygame.sprite.DirtySprite()
                     x, y = event.pos[0] - 2, event.pos[1] - 2
-                    pos.rect = pygame.Rect(x - (APP_SIZE[0] - WORLD_SIZE[0]) // 2, y, 4, 4)
+                    pos.rect = pygame.Rect(x - (APP_SIZE[0] - WORLD_SIZE[0]) // 2, y, 8, 8)
                     print(pos.rect)
                     match = pygame.sprite.spritecollideany(pos, all_individuals)
                     if match:
                         world = world_surface.get_at(match.rect.center)
-                        print(f"Sun: {world[0] / 255} Water: {world[2] / 255}")
-                        print(f"Energy: {match.eval()}")
-                        print(f"Cell age: {match.age}")
-                        print(f"Dead?: {match.eval() == match.config.dead}")
-                        # match.save_tree()
-                    else:
-                        print("no match")
+                        text = f"<b>{match.name} entity found ({id(match)})</b><br/>"
+                        text += f"Sun level: {round(world[0] / 255, 2)}<br/>"
+                        text += f"Water: {round(world[2] / 255, 2)}<br/>"
+                        text += f"Energy: {match.eval()}<br/>"
+                        text += f"Cell age: {match.age}<br/>"
+                        text += "<br/>"
+                        formatted_code, _ = FormatCode(str(match.tree))
+                        text += formatted_code.replace("\n", "<br/>")
+                        popup = UIMessageWindow(
+                            rect=pygame.Rect((100, 100),
+                                             (800, 500)),
+                            window_title='Test Message Window',
+                            html_message=text,
+                            manager=display.manager)
+
 
             display.manager.process_events(event)
         display.clock.tick(game_config.game_speed)
@@ -247,6 +263,9 @@ def main():
                 display.bottom_panel.generation_count.set_text(str(game_config.generation))
                 all_algae.as_group().draw(sprite_surface)
                 all_bacteria.as_group().draw(sprite_surface)
+
+        if game_config.paused:
+            display.window.blit(world_surface, world_surface.get_rect(topleft=((APP_SIZE[0] - WORLD_SIZE[0]) // 2, 0)))
 
         display.window.blit(sprite_surface, sprite_surface.get_rect(topleft=((APP_SIZE[0] - WORLD_SIZE[0]) // 2, 0)))
         display.manager.draw_ui(display.window)

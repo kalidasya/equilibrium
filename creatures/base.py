@@ -1,5 +1,6 @@
 import copy
 import dataclasses
+import multiprocessing
 import operator
 import random
 from multiprocessing.pool import ThreadPool
@@ -11,7 +12,7 @@ import pygame.sprite
 from deap import gp
 from deap.gp import PrimitiveTree
 from deap.tools import selection
-
+from pygame_gui.core import ObjectID
 
 bloat_limiter = gp.staticLimit(operator.attrgetter('height'), 17)
 limited_crossover = bloat_limiter(gp.cxOnePoint)
@@ -144,7 +145,6 @@ class BottomPanel:
         for elem, config_name in self.inputs.items():
             if elem == element:
                 if value is None:
-                    print("WQEWQE")
                     setattr(self.config, config_name, not getattr(self.config, config_name))
                 else:
                     setattr(self.config, config_name, elem.i_type(value))
@@ -171,6 +171,25 @@ class IndividualMenu:
             text=label,
             manager=self.manager,
             container=self.panel,
+            object_id=ObjectID(class_id='@left_alignment', object_id=f"{self.__class__}{config_name}l")
+        )
+        tooltip_rect = pygame.Rect((100, 0), (25, 25))
+        tooltip_button = pygame_gui.elements.UIButton(
+            relative_rect=tooltip_rect,
+            text="?",
+            manager=self.manager,
+            container=self.panel,
+            anchors={
+                'left': 'left',
+                'right': 'right',
+                'top': 'bottom',
+                'bottom': 'bottom',
+                'bottom_target': label,
+                'right_target': label,
+            },
+            tool_tip_text=f"text.individuals_tooltips_{config_name}",
+            object_id=ObjectID(class_id="@tooltip_button", object_id=f"{self.__class__}{config_name}b"),
+            starting_height=10,
         )
         entry = pygame_gui.elements.UITextEntryLine(
             relative_rect=rect.move(label.rect.width, 0),
@@ -188,6 +207,25 @@ class IndividualMenu:
             text=label,
             manager=self.manager,
             container=self.panel,
+            object_id=ObjectID(class_id='@left_alignment', object_id=f"{self.__class__}{config_name}l")
+        )
+        tooltip_rect = pygame.Rect((200, 0), (25, 25))
+        tooltip_button = pygame_gui.elements.UIButton(
+            relative_rect=tooltip_rect,
+            text="?",
+            manager=self.manager,
+            container=self.panel,
+            anchors={
+                'left': 'left',
+                'right': 'right',
+                'top': 'bottom',
+                'bottom': 'bottom',
+                'bottom_target': label,
+                'right_target': label,
+            },
+            tool_tip_text=f"text.individuals_tooltips_{config_name}",
+            object_id=ObjectID(class_id="@tooltip_button", object_id=f"{self.__class__}{config_name}b"),
+            starting_height=10,
         )
         entry = pygame_gui.elements.UITextEntryLine(
             relative_rect=rect.move(0, self.row_height),
@@ -205,6 +243,25 @@ class IndividualMenu:
             text=label,
             manager=self.manager,
             container=self.panel,
+            object_id=ObjectID(class_id='@left_alignment', object_id=f"{self.__class__}{config_name}l")
+        )
+        tooltip_rect = pygame.Rect((200, 0), (25, 25))
+        tooltip_button = pygame_gui.elements.UIButton(
+            relative_rect=tooltip_rect,
+            text="?",
+            manager=self.manager,
+            container=self.panel,
+            anchors={
+                'left': 'left',
+                'right': 'right',
+                'top': 'bottom',
+                'bottom': 'bottom',
+                'bottom_target': label,
+                'right_target': label,
+            },
+            tool_tip_text=f"text.individuals_tooltips_{config_name}",
+            object_id=ObjectID(class_id="@tooltip_button", object_id=f"{self.__class__}{config_name}b"),
+            starting_height=10,
         )
         entry = pygame_gui.elements.UIHorizontalSlider(
             relative_rect=rect.move(0, self.row_height),
@@ -223,6 +280,7 @@ class IndividualMenu:
             text=label,
             manager=self.manager,
             container=self.panel,
+            object_id=ObjectID(class_id='@left_alignment', object_id=f"{self.__class__}{config_name1}{config_name2}l")
         )
         rect = pygame.Rect(start_pos, (self.half_width, self.row_height))
         entry1 = pygame_gui.elements.UITextEntryLine(
@@ -232,6 +290,25 @@ class IndividualMenu:
         )
         entry1.i_type = int
         entry1.set_text(str(getattr(self.config, config_name1)))
+        tooltip_rect = pygame.Rect((100, 0), (25, 25))
+        tooltip_button = pygame_gui.elements.UIButton(
+            relative_rect=tooltip_rect,
+            text="?",
+            manager=self.manager,
+            container=self.panel,
+            anchors={
+                'left': 'left',
+                'right': 'right',
+                'top': 'bottom',
+                'bottom': 'bottom',
+                'bottom_target': entry1,
+                'right_target': entry1,
+            },
+            tool_tip_text=f"text.individuals_tooltips_{config_name1}",
+            object_id=ObjectID(class_id="@tooltip_button", object_id=f"{self.__class__}{config_name1}b"),
+            starting_height=10,
+        )
+
         self.inputs[entry1] = config_name1
         entry2 = pygame_gui.elements.UITextEntryLine(
             relative_rect=rect.move(self.half_width, self.row_height),
@@ -241,6 +318,25 @@ class IndividualMenu:
         entry2.i_type = int
         entry2.set_text(str(getattr(self.config, config_name2)))
         self.inputs[entry2] = config_name2
+        tooltip_rect = pygame.Rect((225, 0), (25, 25))
+        tooltip_button = pygame_gui.elements.UIButton(
+            relative_rect=tooltip_rect,
+            text="?",
+            manager=self.manager,
+            container=self.panel,
+            anchors={
+                'left': 'left',
+                'right': 'right',
+                'top': 'bottom',
+                'bottom': 'bottom',
+                'bottom_target': entry2,
+                'right_target': entry2,
+            },
+            tool_tip_text=f"text.individuals_tooltips_{config_name2}",
+            object_id=ObjectID(class_id="@tooltip_button", object_id=f"{self.__class__}{config_name2}b"),
+            starting_height=10,
+        )
+
         return self.row_height * 2
 
     def draw(self):
@@ -254,8 +350,8 @@ class IndividualMenu:
         pos += self.row_height
         pos += self._input("Width", pygame.Rect((0, pos), (self.half_width, self.row_height)), "width")
         pos += self._input("Height", pygame.Rect((0, pos), (self.half_width, self.row_height)), "height")
-        pos += self._input("Rot -", pygame.Rect((0, pos), (self.half_width, self.row_height)), "rotate_drain")
-        pos += self._input("Move -", pygame.Rect((0, pos), (self.half_width, self.row_height)), "move_drain")
+        pos += self._input("Rotation cost", pygame.Rect((0, pos), (self.half_width, self.row_height)), "rotate_drain")
+        pos += self._input("Move cost", pygame.Rect((0, pos), (self.half_width, self.row_height)), "move_drain")
         pos += self._input("Max energy", pygame.Rect((0, pos), (self.half_width, self.row_height)), "max_energy")
         pos += self._input("Dead", pygame.Rect((0, pos), (self.half_width, self.row_height)), "dead")
         pos += self._input2("Crowded threshold", pygame.Rect((0, pos), (self.width, self.row_height)), "crowded_threshold")

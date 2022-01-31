@@ -30,6 +30,7 @@ class BacteriaMenu(IndividualMenu):
 
 
 class Bacteria(base.Individual):
+    name = "Bacteria"
 
     def __init__(self, world, config, tree=None, center=None, individuals=None):
         super().__init__(world, config, tree=tree, center=center)

@@ -22,6 +22,8 @@ class AlgaeMenu(IndividualMenu):
 
 
 class Algae(base.Individual):
+    name = "Bacteria"
+
     @classmethod
     def set_brain(cls, algae):
         pset = gp.PrimitiveSet("ALGAE", 0)
