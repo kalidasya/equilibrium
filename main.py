@@ -103,6 +103,7 @@ def main():
     algae_config = AlgaeConfig(
         width=2,
         height=2,
+        color=(0, 255, 0, 255),
         max_energy=100,
         rotate_drain=1,
         move_drain=2,
@@ -120,6 +121,7 @@ def main():
     bacteria_config = BacteriaConfig(
         width=2,
         height=2,
+        color=(255, 0, 0, 255),
         max_energy=100,
         rotate_drain=0,
         move_drain=2,
@@ -175,22 +177,25 @@ def main():
                 case pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+                case pygame_gui.UI_COLOUR_PICKER_COLOUR_PICKED:
+                    display.algae_menu.set_config_for_element(event.ui_element, event.colour)
+                    display.bacteria_menu.set_config_for_element(event.ui_element, event.colour)
                 case pygame_gui.UI_TEXT_ENTRY_FINISHED:
                     display.algae_menu.set_config_for_element(event.ui_element, event.text)
                     display.bacteria_menu.set_config_for_element(event.ui_element, event.text)
                 case pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
-                    print(event.value)
                     display.algae_menu.set_config_for_element(event.ui_element, event.value)
                     display.bacteria_menu.set_config_for_element(event.ui_element, event.value)
                     display.bottom_panel.set_config_for_element(event.ui_element, event.value)
                 case pygame_gui.UI_BUTTON_PRESSED:
+                    display.algae_menu.set_config_for_element(event.ui_element)
+                    display.bacteria_menu.set_config_for_element(event.ui_element)
                     display.bottom_panel.set_config_for_element(event.ui_element)
-                case pygame_gui.UI_BUTTON_ON_HOVERED:
-                    print(event.ui_element)
                 case pygame.KEYUP if event.key == pygame.K_SPACE:
                     game_config.paused = not game_config.paused
-                # case pygame.MOUSEBUTTONUP if not sprite_surface.get_rect().collidepoint(event.pos):
-                #     if popup: popup.kill()
+                case pygame.MOUSEBUTTONUP if not sprite_surface.get_rect().collidepoint(event.pos):
+                    if popup and popup.alive():
+                        popup.kill()
                 case pygame.MOUSEBUTTONUP if popup is None or not popup.alive():
                     pos = pygame.sprite.DirtySprite()
                     x, y = event.pos[0] - 2, event.pos[1] - 2
@@ -198,14 +203,12 @@ def main():
                     print(pos.rect)
                     match = pygame.sprite.spritecollideany(pos, all_individuals)
                     if match:
-                        world = world_surface.get_at(match.rect.center)
                         popup = UIMessageWindow(
                             rect=pygame.Rect((100, 100),
                                              (800, 500)),
                             window_title='Test Message Window',
                             html_message=match.get_description(),
                             manager=display.manager)
-
 
             display.manager.process_events(event)
         display.clock.tick(game_config.game_speed)

@@ -35,6 +35,8 @@ class IndividualConfig:
     mating_rect_height: int
     hayflick_limit: int
     max_energy: int
+    color: tuple
+    # color: tuple
 
 
 @dataclasses.dataclass
@@ -299,14 +301,36 @@ class IndividualMenu:
         pos += self._slider("Reset%", pygame.Rect((0, pos), (self.width, self.row_height)), "reset_percent")
         pos += self._multi_input("Mating rect w x h", (0, pos),
                            "mating_rect_width", "mating_rect_height")
+        pos += self._draw(pos)
 
-        self._draw(pos)
+        color_picker = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((0, pos), (self.width, self.row_height)),
+            text="Color",
+            manager=self.manager,
+            container=self.panel,
+            object_id=ObjectID(object_id=f"{id(self)}-color-button"))
+        self.inputs[color_picker] = "color"
+
         return pos
 
-    def set_config_for_element(self, element, value):
-        for elem, config_name in self.inputs.items():
+    def set_config_for_element(self, element, value=None):
+        for elem in list(self.inputs.keys()):
             if elem == element:
-                setattr(self.config, config_name, elem.i_type(value))
+                config_name = self.inputs[elem]
+                if config_name == 'color':
+                    picker = pygame_gui.windows.UIColourPickerDialog(
+                        pygame.Rect((200, 10), (300, 200)),
+                        manager=self.manager,
+                        window_title="Entity color",
+                        initial_colour=pygame.Color(*self.config.color)
+                    )
+                    self.inputs[picker] = 'color_picked'
+                elif config_name == 'color_picked':
+                    element.kill()
+                    self.inputs.pop(element)
+                    self.config.color = value
+                else:
+                    setattr(self.config, config_name, elem.i_type(value))
 
 
 class Individual():
@@ -413,6 +437,13 @@ class Individual():
 
     def eval(self):
         return self.energy
+
+    def get_color(self):
+        dim = int(self.config.max_energy - self.energy)
+        # print(f"Color: {self.config.color} for {id(self.config)} {self.config}")
+        color = np.subtract(self.config.color, (dim, dim, dim, 0))
+        color *= (color > 0)
+        return list(color)
 
 
 def eval_individual(ind):

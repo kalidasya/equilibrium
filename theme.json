@@ -1,7 +1,7 @@
 {
   "defaults": {
     "colours": {
-      "disabled_text": "#FFFFFF",
+      "disabled_text": "#a3a3a3",
       "text_cursor": "#FFFFFF"
     }
   },
@@ -25,8 +25,7 @@
     "misc": {
       "border_width": "1",
       "tool_tip_delay": "0",
-      "shape": "ellipse",
-      "border_width": 0
+      "shape": "ellipse"
     }
   }
 }
