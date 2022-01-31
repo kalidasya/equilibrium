@@ -1,0 +1,22 @@
+{
+  "en": {
+    "individuals_tooltips_width": "The width of the entity.",
+    "individuals_tooltips_height": "The height of the entity.",
+    "individuals_tooltips_rotate_drain": "Energy cost to change direction (90°).",
+    "individuals_tooltips_move_drain": "Energy cost to move.",
+    "individuals_tooltips_mating_percent": "% to be selected for mating",
+    "individuals_tooltips_mutation_chance": "% to be randomly mutated",
+    "individuals_tooltips_crowded_threshold": "If this amount of entities are in the mating rectangle, skip mating.",
+    "individuals_tooltips_population_limit": "Maximum number of entities, if this number is reached the population will not grow.",
+    "individuals_tooltips_reset_percent": "% of enabling mating again after successful mating.",
+    "individuals_tooltips_dead": "Value of energy what is considered dead (min 0, max 100).",
+    "individuals_tooltips_mating_rect_width": "Width of the mating rectangle as addition to the width of the entity.",
+    "individuals_tooltips_mating_rect_height": "Height of the mating rectangle as addition to the height of the entity.",
+    "individuals_tooltips_hayflick_limit": "The allowed number of cell division (mating) before the cell will not able able to mate again.",
+    "individuals_tooltips_max_energy": "The maximum energy value the cell can have (default 100).",
+    "individuals_tooltips_photosynthesis_gain": "The maximum energy gain what can be achieved by photosynthesis.",
+    "individuals_tooltips_food_sensing_distance": "The distance to see if food (algae) can be found in the direction where the entity is facing."
+
+
+  }
+}

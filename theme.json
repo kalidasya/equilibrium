@@ -1,0 +1,26 @@
+{
+  "@left_alignment": {
+    "misc": {
+      "text_horiz_alignment": "left"
+    }
+  },
+  "@tooltip_button": {
+    "font": {
+      "name": "tooltip_button",
+      "size": 18,
+      "text": "?"
+    },
+    "images": {
+      "normal_image": {
+        "package": "data.images",
+        "resource": "baseline_question_mark_black_23px.png"
+      }
+    },
+    "misc": {
+      "border_width": "1",
+      "tool_tip_delay": "0",
+      "shape": "ellipse",
+      "border_width": 0
+    }
+  }
+}
