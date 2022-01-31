@@ -1,9 +1,11 @@
 import copy
 import dataclasses
+import html
 from functools import partial
 
 import pygame
 from deap import gp
+from yapf.yapflib.yapf_api import FormatCode
 
 from creatures import base
 from creatures.base import IndividualConfig, IndividualMenu
@@ -108,7 +110,16 @@ class Bacteria(base.Individual):
         ret.individuals = self.individuals
         return ret
 
-    def __repr__(self):
+    def get_description(self):
+        formatted_code, _ = FormatCode(str(self.tree))
+        return f"""<b>{html.escape(str(self))} entity found</b>
+Food ahead: {self.is_food_ahead()}
+Energy: {self.eval()}
+Cell age: {self.age}
+<hr/>
+{formatted_code}""".replace("\n", "<br/>")
+
+    def __str__(self):
         return f"<Bacteria {id(self)} {self.rect}>"
 
 

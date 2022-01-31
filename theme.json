@@ -1,4 +1,10 @@
 {
+  "defaults": {
+    "colours": {
+      "disabled_text": "#FFFFFF",
+      "text_cursor": "#FFFFFF"
+    }
+  },
   "@left_alignment": {
     "misc": {
       "text_horiz_alignment": "left"

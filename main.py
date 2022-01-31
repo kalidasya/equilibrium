@@ -10,12 +10,11 @@ import pygame_gui
 from PIL import Image, ImageOps
 from perlin_numpy import generate_perlin_noise_2d, generate_fractal_noise_2d
 from pygame_gui.windows import UIMessageWindow
-from yapf.yapflib.yapf_api import FormatCode
 
 import creatures
 from creatures.algae import AlgaeConfig, AlgaeMenu
 from creatures.bacteria import BacteriaConfig, BacteriaMenu
-from creatures.base import IndividualConfig, WorldResources, IndividualMenu, BottomPanel, GameConfig
+from creatures.base import WorldResources, IndividualMenu, BottomPanel, GameConfig
 
 APP_SIZE = 1024, 768
 WORLD_SIZE = 512, 512
@@ -190,6 +189,8 @@ def main():
                     print(event.ui_element)
                 case pygame.KEYUP if event.key == pygame.K_SPACE:
                     game_config.paused = not game_config.paused
+                # case pygame.MOUSEBUTTONUP if not sprite_surface.get_rect().collidepoint(event.pos):
+                #     if popup: popup.kill()
                 case pygame.MOUSEBUTTONUP if popup is None or not popup.alive():
                     pos = pygame.sprite.DirtySprite()
                     x, y = event.pos[0] - 2, event.pos[1] - 2
@@ -198,19 +199,11 @@ def main():
                     match = pygame.sprite.spritecollideany(pos, all_individuals)
                     if match:
                         world = world_surface.get_at(match.rect.center)
-                        text = f"<b>{match.name} entity found ({id(match)})</b><br/>"
-                        text += f"Sun level: {round(world[0] / 255, 2)}<br/>"
-                        text += f"Water: {round(world[2] / 255, 2)}<br/>"
-                        text += f"Energy: {match.eval()}<br/>"
-                        text += f"Cell age: {match.age}<br/>"
-                        text += "<br/>"
-                        formatted_code, _ = FormatCode(str(match.tree))
-                        text += formatted_code.replace("\n", "<br/>")
                         popup = UIMessageWindow(
                             rect=pygame.Rect((100, 100),
                                              (800, 500)),
                             window_title='Test Message Window',
-                            html_message=text,
+                            html_message=match.get_description(),
                             manager=display.manager)
 
 
