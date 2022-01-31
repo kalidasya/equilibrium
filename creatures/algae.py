@@ -20,7 +20,7 @@ class AlgaeConfig(IndividualConfig):
 class AlgaeMenu(IndividualMenu):
 
     def _draw(self, pos):
-        pos += self._input2("Photosynthesis gain", pygame.Rect((0, pos), (self.width, self.row_height)),
+        return self._input2("Photosynthesis gain", pygame.Rect((0, pos), (self.width, self.row_height)),
                             "photosynthesis_gain")
 
 
@@ -52,9 +52,6 @@ class Algae(base.Individual):
             coords = self.rect.center
         water = self.world.water[coords[0], coords[1]]
         return water / 255
-
-    def get_color(self):
-        return 0, 255 - int(self.config.max_energy - self.energy), 0, 255
 
     def photosynthesize(self):
         efficiency = min(self._get_light_level(), self._get_water_level())

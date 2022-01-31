@@ -27,8 +27,7 @@ class BacteriaConfig(IndividualConfig):
 class BacteriaMenu(IndividualMenu):
 
     def _draw(self, pos):
-        pos += self._input2("Food sensing distance", pygame.Rect((0, pos), (self.width, self.row_height)), "food_sensing_distance")
-
+        return self._input2("Food sensing distance", pygame.Rect((0, pos), (self.width, self.row_height)), "food_sensing_distance")
 
 
 class Bacteria(base.Individual):
@@ -50,9 +49,6 @@ class Bacteria(base.Individual):
         pset.addTerminal(bacteria.rotate_left)
         pset.addTerminal(bacteria.rotate_right)
         return pset
-
-    def get_color(self):
-        return 255 - (100 - int(self.energy)), 0, 0, 255
 
     def move(self):
         vector = super().move()
