@@ -206,7 +206,7 @@ def main():
                         popup = UIMessageWindow(
                             rect=pygame.Rect((100, 100),
                                              (800, 500)),
-                            window_title='Test Message Window',
+                            window_title='Entity info',
                             html_message=match.get_description(),
                             manager=display.manager)
 

@@ -36,7 +36,6 @@ class IndividualConfig:
     hayflick_limit: int
     max_energy: int
     color: tuple
-    # color: tuple
 
 
 @dataclasses.dataclass
@@ -352,10 +351,27 @@ class Individual():
         self.dir = random.randint(0, 3)
 
         self.pset = self.set_brain(self)
+        self._routine = None
+        self._tree = None
+
         if tree is None:
             self.tree = PrimitiveTree(self.expr_init())
         else:
             self.tree = copy.deepcopy(tree)
+
+    @property
+    def tree(self):
+        return self._tree
+
+    @tree.setter
+    def tree(self, value):
+        self._tree = value
+        # Transform the tree expression to functional Python code
+        self._routine = gp.compile(self._tree, self.pset)
+
+    @tree.deleter
+    def tree(self):
+        del self._tree
 
     def _dec_energy(self, val):
         self.energy -= val
@@ -378,6 +394,7 @@ class Individual():
         ind1.age += 1
         ind2.age += 1
         tree1, tree2 = limited_crossover(copy.deepcopy(ind1.tree), copy.deepcopy(ind2.tree))
+
         child1 = ind1.copy()
         child1.tree = tree1
         child1.mated = True
@@ -402,6 +419,9 @@ class Individual():
         :return:
         """
         return not self.mated and self.age < self.config.hayflick_limit
+
+    def can_mutate(self):
+        return self.age < self.config.hayflick_limit
 
     def rotate_left(self):
         self._dec_energy(self.config.rotate_drain)
@@ -432,8 +452,9 @@ class Individual():
         self.mating_rect.move_ip(*move)
         return move
 
-    def run(self, routine):
-        routine()
+    def run(self):
+        self._routine()
+        return self
 
     def eval(self):
         return self.energy
@@ -444,15 +465,6 @@ class Individual():
         color = np.subtract(self.config.color, (dim, dim, dim, 0))
         color *= (color > 0)
         return list(color)
-
-
-def eval_individual(ind):
-    # Transform the tree expression to functional Python code
-    routine = gp.compile(ind.tree, ind.pset)
-    # Run the generated routine
-
-    ind.run(routine)
-    return ind
 
 
 def vicinity_collision(left, right):
@@ -474,7 +486,7 @@ class Population(list):
         :return:
         """
         pool = ThreadPool()
-        new_population = pool.map(eval_individual, self, chunksize=500)
+        new_population = pool.map(lambda a: a.run(), self, chunksize=500)
         self[:] = new_population
 
     def grow_population(self):
@@ -534,7 +546,7 @@ class Population(list):
             ind.mated = False
 
     def mutate_population(self):
-        for ind in self:
+        for ind in [a for a in self if a.can_mutate()]:
             if random.random() <= ind.config.mutation_chance:
                 ind.mutate()
 
